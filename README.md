@@ -1,0 +1,1 @@
+# zellij-status-tab-bar
