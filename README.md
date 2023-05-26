@@ -15,3 +15,4 @@ layout {
 }
 
 # 测试 zellij -l stb
+![demo](demo.gif)

@@ -1,4 +1,4 @@
-use crate::{line::tab_separator, LinePart};
+use crate::{line::tab_separator, TabLinePart};
 use ansi_term::{ANSIString, ANSIStrings};
 use unicode_width::UnicodeWidthStr;
 use zellij_tile::prelude::*;
@@ -23,7 +23,7 @@ pub fn render_tab(
     is_alternate_tab: bool,
     palette: Palette,
     separator: &str,
-) -> LinePart {
+) -> TabLinePart {
     let focused_clients = tab.other_focused_clients.as_slice();
     let separator_width = separator.width();
     let alternate_tab_color = match palette.theme_hue {
@@ -73,7 +73,7 @@ pub fn render_tab(
         ANSIStrings(&[left_separator, tab_styled_text, right_separator]).to_string()
     };
 
-    LinePart {
+    TabLinePart {
         part: tab_styled_text,
         len: tab_text_len,
         tab_index: Some(tab.position),
@@ -86,7 +86,7 @@ pub fn tab_style(
     mut is_alternate_tab: bool,
     palette: Palette,
     capabilities: PluginCapabilities,
-) -> LinePart {
+) -> TabLinePart {
     let separator = tab_separator(capabilities);
 
     if tab.is_sync_panes_active {

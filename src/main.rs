@@ -1,6 +1,8 @@
 mod first_line;
 mod second_line;
 mod tip;
+mod line;
+mod tab;
 
 use ansi_term::{
     ANSIString,
@@ -8,7 +10,9 @@ use ansi_term::{
     Style,
 };
 
+use std::convert::TryInto;
 use std::fmt::{Display, Error, Formatter};
+
 use zellij_tile::prelude::actions::Action;
 use zellij_tile::prelude::*;
 use zellij_tile_utils::{palette_match, style};
@@ -21,6 +25,9 @@ use second_line::{
 };
 use tip::utils::get_cached_tip_name;
 
+use line::tab_line;
+use tab::tab_style;
+
 // for more of these, copy paste from: https://en.wikipedia.org/wiki/Box-drawing_character
 static ARROW_SEPARATOR: &str = "";
 static MORE_MSG: &str = " ... ";
@@ -30,13 +37,22 @@ const TO_NORMAL: Action = Action::SwitchToMode(InputMode::Normal);
 #[derive(Default)]
 struct State {
     tabs: Vec<TabInfo>,
-    tip_name: String,
+    active_tab_idx: usize,
     mode_info: ModeInfo,
+    should_change_tab: bool,
+    tip_name: String,
     text_copy_destination: Option<CopyDestination>,
     display_system_clipboard_failure: bool,
 }
 
 register_plugin!(State);
+
+#[derive(Debug, Default)]
+pub struct TabLinePart {
+    part: String,
+    len: usize,
+    tab_index: Option<usize>,
+}
 
 #[derive(Default)]
 pub struct LinePart {
@@ -199,10 +215,17 @@ impl ZellijPlugin for State {
                 self.mode_info = mode_info;
             },
             Event::TabUpdate(tabs) => {
-                if self.tabs != tabs {
-                    should_render = true;
+                if let Some(active_tab_index) = tabs.iter().position(|t| t.active) {
+                    // tabs are indexed starting from 1 so we need to add 1
+                    let active_tab_idx = active_tab_index + 1;
+                    if self.active_tab_idx != active_tab_idx || self.tabs != tabs {
+                        should_render = true;
+                    }
+                    self.active_tab_idx = active_tab_idx;
+                    self.tabs = tabs;
+                } else {
+                    eprintln!("Could not find active tab.");
                 }
-                self.tabs = tabs;
             },
             Event::CopyToClipboard(copy_destination) => {
                 match self.text_copy_destination {
@@ -243,8 +266,61 @@ impl ZellijPlugin for State {
             ""
         };
 
+        // Tab bar
+        if self.tabs.is_empty() {
+            return;
+        }
+        let mut all_tabs: Vec<TabLinePart> = vec![];
+        let mut active_tab_index = 0;
+        let mut is_alternate_tab = false;
+        for t in &mut self.tabs {
+            let mut tabname = t.name.clone();
+            if t.active && self.mode_info.mode == InputMode::RenameTab {
+                if tabname.is_empty() {
+                    tabname = String::from("Enter name...");
+                }
+                active_tab_index = t.position;
+            } else if t.active {
+                active_tab_index = t.position;
+            }
+            let tab = tab_style(
+                tabname,
+                t,
+                is_alternate_tab,
+                self.mode_info.style.colors,
+                self.mode_info.capabilities,
+            );
+            is_alternate_tab = !is_alternate_tab;
+            all_tabs.push(tab);
+        }
+        let tab_line = tab_line(
+            self.mode_info.session_name.as_deref(),
+            all_tabs,
+            active_tab_index,
+            cols.saturating_sub(1),
+            self.mode_info.style.colors,
+            self.mode_info.capabilities,
+            self.mode_info.style.hide_session_name,
+        );
+        let mut s = String::new();
+        let mut len_cnt = 0;
+        for bar_part in tab_line {
+            s = format!("{}{}", s, &bar_part.part);
+
+            if self.should_change_tab
+                && bar_part.tab_index.is_some()
+            {
+                // Tabs are indexed starting from 1, therefore we need add 1 to tab_index.
+                let tab_index: u32 = bar_part.tab_index.unwrap().try_into().unwrap();
+                switch_tab_to(tab_index + 1);
+            }
+            len_cnt += bar_part.len;
+        }
+        self.should_change_tab = false;
+
+        // Status bar
         let active_tab = self.tabs.iter().find(|t| t.active);
-        let first_line = first_line(&self.mode_info, active_tab, cols, separator);
+        let first_line = s + first_line(&self.mode_info, active_tab, cols - len_cnt, separator).part.as_str();
         let second_line = self.second_line(cols);
 
         let background = match self.mode_info.style.colors.theme_hue {

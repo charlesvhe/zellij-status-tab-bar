@@ -1,20 +1,20 @@
 use ansi_term::ANSIStrings;
 use unicode_width::UnicodeWidthStr;
 
-use crate::{LinePart, ARROW_SEPARATOR};
+use crate::{TabLinePart, ARROW_SEPARATOR};
 use zellij_tile::prelude::*;
 use zellij_tile_utils::style;
 
-fn get_current_title_len(current_title: &[LinePart]) -> usize {
+fn get_current_title_len(current_title: &[TabLinePart]) -> usize {
     current_title.iter().map(|p| p.len).sum()
 }
 
 // move elements from before_active and after_active into tabs_to_render while they fit in cols
 // adds collapsed_tabs to the left and right if there's left over tabs that don't fit
 fn populate_tabs_in_tab_line(
-    tabs_before_active: &mut Vec<LinePart>,
-    tabs_after_active: &mut Vec<LinePart>,
-    tabs_to_render: &mut Vec<LinePart>,
+    tabs_before_active: &mut Vec<TabLinePart>,
+    tabs_after_active: &mut Vec<TabLinePart>,
+    tabs_to_render: &mut Vec<TabLinePart>,
     cols: usize,
     palette: Palette,
     capabilities: PluginCapabilities,
@@ -111,9 +111,9 @@ fn left_more_message(
     palette: Palette,
     separator: &str,
     tab_index: usize,
-) -> LinePart {
+) -> TabLinePart {
     if tab_count_to_the_left == 0 {
-        return LinePart::default();
+        return TabLinePart::default();
     }
     let more_text = if tab_count_to_the_left < 10000 {
         format!(" ← +{} ", tab_count_to_the_left)
@@ -132,7 +132,7 @@ fn left_more_message(
     let right_separator = style!(palette.orange, sep_color).paint(separator);
     let more_styled_text =
         ANSIStrings(&[left_separator, more_styled_text, right_separator]).to_string();
-    LinePart {
+    TabLinePart {
         part: more_styled_text,
         len: more_text_len,
         tab_index: Some(tab_index),
@@ -144,9 +144,9 @@ fn right_more_message(
     palette: Palette,
     separator: &str,
     tab_index: usize,
-) -> LinePart {
+) -> TabLinePart {
     if tab_count_to_the_right == 0 {
-        return LinePart::default();
+        return TabLinePart::default();
     };
     let more_text = if tab_count_to_the_right < 10000 {
         format!(" +{} → ", tab_count_to_the_right)
@@ -164,14 +164,14 @@ fn right_more_message(
     let right_separator = style!(palette.orange, sep_color).paint(separator);
     let more_styled_text =
         ANSIStrings(&[left_separator, more_styled_text, right_separator]).to_string();
-    LinePart {
+    TabLinePart {
         part: more_styled_text,
         len: more_text_len,
         tab_index: Some(tab_index),
     }
 }
 
-fn tab_line_prefix(session_name: Option<&str>, palette: Palette, cols: usize) -> Vec<LinePart> {
+fn tab_line_prefix(session_name: Option<&str>, palette: Palette, cols: usize) -> Vec<TabLinePart> {
     let prefix_text = " Zellij ".to_string();
 
     let prefix_text_len = prefix_text.chars().count();
@@ -184,7 +184,7 @@ fn tab_line_prefix(session_name: Option<&str>, palette: Palette, cols: usize) ->
         ThemeHue::Light => palette.white,
     };
     let prefix_styled_text = style!(text_color, bg_color).bold().paint(prefix_text);
-    let mut parts = vec![LinePart {
+    let mut parts = vec![TabLinePart {
         part: prefix_styled_text.to_string(),
         len: prefix_text_len,
         tab_index: None,
@@ -198,7 +198,7 @@ fn tab_line_prefix(session_name: Option<&str>, palette: Palette, cols: usize) ->
         };
         let name_part_styled_text = style!(text_color, bg_color).bold().paint(name_part);
         if cols.saturating_sub(prefix_text_len) >= name_part_len {
-            parts.push(LinePart {
+            parts.push(TabLinePart {
                 part: name_part_styled_text.to_string(),
                 len: name_part_len,
                 tab_index: None,
@@ -218,13 +218,13 @@ pub fn tab_separator(capabilities: PluginCapabilities) -> &'static str {
 
 pub fn tab_line(
     session_name: Option<&str>,
-    mut all_tabs: Vec<LinePart>,
+    mut all_tabs: Vec<TabLinePart>,
     active_tab_index: usize,
     cols: usize,
     palette: Palette,
     capabilities: PluginCapabilities,
     hide_session_name: bool,
-) -> Vec<LinePart> {
+) -> Vec<TabLinePart> {
     let mut tabs_after_active = all_tabs.split_off(active_tab_index);
     let mut tabs_before_active = all_tabs;
     let active_tab = if !tabs_after_active.is_empty() {
