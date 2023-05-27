@@ -1,6 +1,8 @@
 # copy zellij-0.36.0/default-plugins/ status-bar+tab-bar
 # 编译wasm
-`cargo build --target wasm32-wasi`
+debug `cargo build --target wasm32-wasi`
+
+release `cargo build -r --target wasm32-wasi`
 
 # 添加测试配置 ~/.config/zellij/layouts/stb.kdl
 ```
